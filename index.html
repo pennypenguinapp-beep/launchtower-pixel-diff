@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Art Diff — LaunchTower</title>
+<style>
+  :root {
+    --bg: #12141a;
+    --panel: #1a1d26;
+    --panel2: #222633;
+    --border: #2e3342;
+    --text: #e8eaf0;
+    --muted: #8a90a3;
+    --accent: #4f8cff;
+    --accent2: #34d399;
+    --danger: #f87171;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  header { text-align: center; margin-bottom: 20px; max-width: 720px; }
+  h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin-bottom: 6px; }
+  h1 .brand { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+
+  .upload-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .drop {
+    flex: 1 1 220px;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .drop:hover, .drop.dragover { border-color: var(--accent); background: rgba(79,140,255,0.06); }
+  .drop.loaded { border-color: var(--accent2); border-style: solid; }
+  .drop .icon { font-size: 1.6rem; margin-bottom: 6px; }
+  .drop .label { font-size: 0.85rem; color: var(--text); }
+  .drop .hint { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+  .drop input[type=file] { display: none; }
+  .drop .thumb {
+    max-width: 100%; max-height: 90px; margin-top: 8px;
+    image-rendering: pixelated; border-radius: 4px;
+    background: repeating-conic-gradient(#2a2e3a 0 25%, #20242f 0 50%) 0 0/16px 16px;
+  }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .ctl { display: flex; flex-direction: column; gap: 5px; }
+  .ctl label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .ctl .val { font-size: 0.72rem; color: var(--accent2); }
+  select, button {
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  select:hover, button:hover { border-color: var(--accent); }
+  input[type=range] { accent-color: var(--accent); width: 160px; }
+  .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .toggle input { accent-color: var(--accent2); width: 16px; height: 16px; }
+  .toggle span { font-size: 0.85rem; }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    padding: 10px 20px;
+  }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; }
+
+  .viewers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .viewer {
+    background: repeating-conic-gradient(#20242f 0 25%, #191c25 0 50%) 0 0/16px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-height: 180px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .viewer canvas { image-rendering: pixelated; max-width: 100%; max-height: 320px; }
+  .viewer .tag {
+    position: absolute; top: 8px; left: 8px;
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+    background: rgba(0,0,0,0.55); padding: 3px 8px; border-radius: 6px; color: var(--muted);
+  }
+  .viewer .placeholder { color: var(--muted); font-size: 0.8rem; }
+
+  .compare-wrap { position: relative; }
+  .compare-wrap canvas { display: block; }
+  .compare-divider {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: var(--accent); pointer-events: none;
+  }
+  .compare-divider .handle {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); border: 2px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: #fff; font-weight: 700;
+  }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; }
+  .stat {
+    flex: 1 1 120px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat .num { font-size: 1.4rem; font-weight: 700; }
+  .stat .lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+  .stat.changed .num { color: var(--danger); }
+  .stat.same .num { color: var(--accent2); }
+  .stat.total .num { color: var(--warn); }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 0.78rem; color: var(--muted); }
+  .legend .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .msg { font-size: 0.82rem; color: var(--muted); margin-top: 10px; min-height: 1.2em; }
+  .msg.ok { color: var(--accent2); }
+  .msg.err { color: var(--danger); }
+
+  footer { margin-top: 28px; text-align: center; }
+  footer a { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+  footer a:hover { text-decoration: underline; }
+  footer .fine { color: var(--muted); font-size: 0.72rem; margin-top: 6px; }
+
+  @media (max-width: 560px) {
+    .viewers { grid-template-columns: 1fr; }
+    input[type=range] { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pixel Art <span class="brand">Diff</span></h1>
+  <p class="sub">Upload two versions of a sprite and see exactly what changed. Highlight the diff, onion-skin the layers, or drag a slider to compare side by side. 100% in your browser — nothing is uploaded.</p>
+</header>
+
+<div class="card">
+  <h2>1 · Load two versions</h2>
+  <div class="upload-row">
+    <div class="drop" id="dropA">
+      <div class="icon">🖼️</div>
+      <div class="label">Version A (before)</div>
+      <div class="hint">PNG / JPG / WebP / GIF — click or drop</div>
+      <img class="thumb" id="thumbA" hidden>
+      <input type="file" id="fileA" accept="image/png,image/jpeg,image/webp,image/gif">
+    </div>
+    <div class="drop" id="dropB">
+      <div class="icon">🖼️</div>
+      <div class="label">Version B (after)</div>
+      <div class="hint">PNG / JPG / WebP / GIF — click or drop</div>
+      <img class="thumb" id="thumbB" hidden>
+      <input type="file" id="fileB" accept="image/png,image/jpeg,image/webp,image/gif">
+    </div>
+  </div>
+  <div class="msg" id="loadMsg"></div>
+</div>
+
+<div class="card">
+  <h2>2 · Compare mode</h2>
+  <div class="controls">
+    <div class="ctl">
+      <label>View</label>
+      <select id="mode">
+        <option value="diff">Diff highlight</option>
+        <option value="onion">Onion-skin overlay</option>
+        <option value="slider">Slider compare</option>
+      </select>
+    </div>
+    <div class="ctl" id="zoomCtl">
+      <label>Zoom <span class="val" id="zoomVal">8×</span></label>
+      <input type="range" id="zoom" min="1" max="32" value="8">
+    </div>
+    <div class="ctl" id="opacityCtl" style="display:none">
+      <label>Onion opacity <span class="val" id="opVal">50%</span></label>
+      <input type="range" id="opacity" min="5" max="100" value="50">
+    </div>
+    <div class="ctl" id="sliderCtl" style="display:none">
+      <label>Divider <span class="val" id="sliderVal">50%</span></label>
+      <input type="range" id="sliderPos" min="0" max="100" value="50">
+    </div>
+    <div class="ctl">
+      <label>&nbsp;</label>
+      <label class="toggle"><input type="checkbox" id="gridToggle"><span>Pixel grid</span></label>
+    </div>
+    <div class="ctl">
+      <label>&nbsp;</label>
+      <button class="btn-primary" id="runBtn" disabled>Run diff</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>3 · Result</h2>
+  <div class="viewers" id="viewers">
+    <div class="viewer" id="viewerMain">
+      <span class="tag" id="mainTag">Diff</span>
+      <span class="placeholder" id="mainPlaceholder">Load both images and press “Run diff”</span>
+      <canvas id="mainCanvas" hidden></canvas>
+    </div>
+    <div class="viewer" id="viewerSide">
+      <span class="tag" id="sideTag">Originals</span>
+      <canvas id="sideCanvas" hidden></canvas>
+      <span class="placeholder" id="sidePlaceholder">A over B preview</span>
+    </div>
+  </div>
+  <div class="legend" id="legend" style="display:none">
+    <span><span class="chip" style="background:#f87171"></span>Changed</span>
+    <span><span class="chip" style="background:#34d399"></span>Added (only in B)</span>
+    <span><span class="chip" style="background:#fbbf24"></span>Removed (only in A)</span>
+    <span><span class="chip" style="background:#3a3f4e"></span>Unchanged</span>
+  </div>
+  <div class="stats" id="stats" style="display:none">
+    <div class="stat total"><div class="num" id="stTotal">0</div><div class="lbl">Total pixels</div></div>
+    <div class="stat changed"><div class="num" id="stChanged">0</div><div class="lbl">Changed</div></div>
+    <div class="stat same"><div class="num" id="stSame">0</div><div class="lbl">Identical</div></div>
+    <div class="stat"><div class="num" id="stPct">0%</div><div class="lbl">Change %</div></div>
+  </div>
+  <div class="actions" style="margin-top:14px">
+    <button class="btn-ghost" id="dlDiff" disabled>⬇ Download diff PNG</button>
+    <button class="btn-ghost" id="dlOverlay" disabled>⬇ Download onion overlay</button>
+    <button class="btn-ghost" id="resetBtn">Reset</button>
+  </div>
+  <div class="msg" id="runMsg"></div>
+</div>
+
+<footer>
+  <a href="https://pennypenguinapp-beep.github.io/" target="_blank" rel="noopener">More free pixel-art &amp; game-dev tools →</a>
+  <div class="fine">LaunchTower · runs entirely in your browser · no uploads, no tracking</div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var imgA = null, imgB = null;
+  var dataA = null, dataB = null;   // {w,h,data}
+  var diffData = null;             // {w,h,data,changed,added,removed,total}
+  var zoom = 8;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- file loading ----------
+  function wireDrop(dropEl, inputEl, thumbEl, setter) {
+    dropEl.addEventListener("click", function () { inputEl.click(); });
+    inputEl.addEventListener("change", function () {
+      if (inputEl.files && inputEl.files[0]) loadFile(inputEl.files[0], thumbEl, setter);
+    });
+    ["dragover", "dragenter"].forEach(function (ev) {
+      dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.add("dragover"); });
+    });
+    ["dragleave", "drop"].forEach(function (ev) {
+      dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.remove("dragover"); });
+    });
+    dropEl.addEventListener("drop", function (e) {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadFile(e.dataTransfer.files[0], thumbEl, setter);
+      }
+    });
+  }
+
+  function loadFile(file, thumbEl, setter) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      thumbEl.src = url;
+      thumbEl.hidden = false;
+      setter(img);
+      updateReady();
+    };
+    img.onerror = function () {
+      setLoadMsg("Could not read that image file.", true);
+    };
+    img.src = url;
+  }
+
+  wireDrop($("dropA"), $("fileA"), $("thumbA"), function (img) { imgA = img; });
+  wireDrop($("dropB"), $("fileB"), $("thumbB"), function (img) { imgB = img; });
+
+  function setLoadMsg(text, isErr) {
+    var m = $("loadMsg");
+    m.textContent = text || "";
+    m.className = "msg" + (isErr ? " err" : "");
+  }
+
+  function updateReady() {
+    $("runBtn").disabled = !(imgA && imgB);
+  }
+
+  // ---------- canvas helpers ----------
+  function toImageData(img) {
+    var w = img.naturalWidth || img.width;
+    var h = img.naturalHeight || img.height;
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    var ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    return { w: w, h: h, data: ctx.getImageData(0, 0, w, h).data };
+  }
+
+  // ---------- diff ----------
+  function computeDiff() {
+    dataA = toImageData(imgA);
+    dataB = toImageData(imgB);
+    var w = Math.max(dataA.w, dataB.w);
+    var h = Math.max(dataA.h, dataB.h);
+    var out = new Uint8ClampedArray(w * h * 4);
+    var changed = 0, added = 0, removed = 0, total = w * h;
+
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var i = (y * w + x) * 4;
+        var a = (y < dataA.h && x < dataA.w) ? dataA.data[((y * dataA.w) + x) * 4] : null;
+        var b = (y < dataB.h && x < dataB.w) ? dataB.data[((y * dataB.w) + x) * 4] : null;
+        var aT = a ? a[3] : 0, bT = b ? b[3] : 0;
+
+        if (aT > 127 && bT > 127) {
+          var dr = Math.abs(a[0] - b[0]), dg = Math.abs(a[1] - b[1]), db = Math.abs(a[2] - b[2]);
+          if (dr + dg + db > 24) {
+            changed++;
+            out[i] = 248; out[i+1] = 113; out[i+2] = 113; out[i+3] = 255; // red
+          } else {
+            out[i] = a[0]; out[i+1] = a[1]; out[i+2] = a[2]; out[i+3] = 255; // unchanged
+          }
+        } else if (bT > 127) {
+          added++;
+          out[i] = 52; out[i+1] = 211; out[i+2] = 153; out[i+3] = 255; // green = added in B
+        } else if (aT > 127) {
+          removed++;
+          out[i] = 251; out[i+1] = 191; out[i+2] = 36; out[i+3] = 255; // amber = removed
+        } else {
+          out[i+3] = 0; // transparent
+        }
+      }
+    }
+    diffData = { w: w, h: h, data: out, changed: changed, added: added, removed: removed, total: total };
+  }
+
+  // ---------- rendering ----------
+  function makeCanvas(w, h) {
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  function drawZoomed(canvas, srcData, z) {
+    canvas.width = srcData.w * z;
+    canvas.height = srcData.h * z;
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    var tmp = makeCanvas(srcData.w, srcData.h);
+    tmp.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(srcData.data), srcData.w, srcData.h), 0, 0);
+    ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
+    if ($("gridToggle").checked) drawGrid(ctx, srcData.w, z);
+  }
+
+  function drawGrid(ctx, cols, z) {
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1;
+    for (var x = 0; x <= cols; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * z + 0.5, 0);
+      ctx.lineTo(x * z + 0.5, cols * z);
+      ctx.stroke();
+    }
+    for (var y = 0; y <= cols; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * z + 0.5);
+      ctx.lineTo(cols * z, y * z + 0.5);
+      ctx.stroke();
+    }
+  }
+
+  function drawOnion(canvas, z) {
+    canvas.width = diffData.w * z;
+    canvas.height = diffData.h * z;
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    var op = parseInt($("opacity").value, 10) / 100;
+
+    // base: version B
+    var tmpB = makeCanvas(diffData.w, diffData.h);
+    tmpB.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataB.data), dataB.w, dataB.h), 0, 0);
+    ctx.drawImage(tmpB, 0, 0, canvas.width, canvas.height);
+
+    // overlay: version A at opacity
+    ctx.globalAlpha = op;
+    var tmpA = makeCanvas(diffData.w, diffData.h);
+    tmpA.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataA.data), dataA.w, dataA.h), 0, 0);
+    ctx.drawImage(tmpA, 0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+
+    if ($("gridToggle").checked) drawGrid(ctx, diffData.w, z);
+  }
+
+  function drawSlider(canvas, z) {
+    canvas.width = diffData.w * z;
+    canvas.height = diffData.h * z;
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    var pos = parseInt($("sliderPos").value, 10) / 100;
+    var splitX = Math.round(canvas.width * pos);
+
+    var tmpA = makeCanvas(diffData.w, diffData.h);
+    tmpA.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataA.data), dataA.w, dataA.h), 0, 0);
+    var tmpB = makeCanvas(diffData.w, diffData.h);
+    tmpB.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataB.data), dataB.w, dataB.h), 0, 0);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, splitX, canvas.height);
+    ctx.clip();
+    ctx.drawImage(tmpB, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(splitX, 0, canvas.width - splitX, canvas.height);
+    ctx.clip();
+    ctx.drawImage(tmpA, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    // divider line
+    ctx.strokeStyle = "#4f8cff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(splitX, 0);
+    ctx.lineTo(splitX, canvas.height);
+    ctx.stroke();
+
+    if ($("gridToggle").checked) drawGrid(ctx, diffData.w, z);
+  }
+
+  function drawSidePreview() {
+    var c = $("sideCanvas");
+    var z = zoom;
+    c.width = diffData.w * z;
+    c.height = diffData.h * z;
+    var ctx = c.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    var tmpB = makeCanvas(diffData.w, diffData.h);
+    tmpB.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataB.data), dataB.w, dataB.h), 0, 0);
+    ctx.drawImage(tmpB, 0, 0, c.width, c.height);
+    ctx.globalAlpha = 0.5;
+    var tmpA = makeCanvas(diffData.w, diffData.h);
+    tmpA.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataA.data), dataA.w, dataA.h), 0, 0);
+    ctx.drawImage(tmpA, 0, 0, c.width, c.height);
+    ctx.globalAlpha = 1;
+  }
+
+  function render() {
+    if (!diffData) return;
+    var mode = $("mode").value;
+    var main = $("mainCanvas");
+    $("mainPlaceholder").style.display = "none";
+    $("sidePlaceholder").style.display = "none";
+    main.hidden = false;
+    $("sideCanvas").hidden = false;
+    $("legend").style.display = (mode === "diff") ? "flex" : "none";
+    $("mainTag").textContent = mode === "diff" ? "Diff" : (mode === "onion" ? "Onion" : "Slider");
+    $("sideTag").textContent = "A over B";
+
+    if (mode === "diff") drawZoomed(main, diffData, zoom);
+    else if (mode === "onion") drawOnion(main, zoom);
+    else drawSlider(main, zoom);
+
+    drawSidePreview();
+  }
+
+  function showStats() {
+    $("stats").style.display = "flex";
+    $("stTotal").textContent = diffData.total.toLocaleString();
+    $("stChanged").textContent = diffData.changed.toLocaleString();
+    $("stSame").textContent = (diffData.total - diffData.changed).toLocaleString();
+    var pct = diffData.total ? (diffData.changed / diffData.total * 100) : 0;
+    $("stPct").textContent = pct.toFixed(1) + "%";
+    $("dlDiff").disabled = false;
+    $("dlOverlay").disabled = false;
+  }
+
+  // ---------- run ----------
+  $("runBtn").addEventListener("click", function () {
+    try {
+      computeDiff();
+      render();
+      showStats();
+      var m = $("runMsg");
+      m.textContent = "Diff complete — " + diffData.changed.toLocaleString() + " pixels changed (" +
+        diffData.added.toLocaleString() + " added, " + diffData.removed.toLocaleString() + " removed).";
+      m.className = "msg ok";
+    } catch (e) {
+      var m2 = $("runMsg");
+      m2.textContent = "Error: " + e.message;
+      m2.className = "msg err";
+    }
+  });
+
+  // ---------- controls ----------
+  $("mode").addEventListener("change", function () {
+    var m = this.value;
+    $("opacityCtl").style.display = (m === "onion") ? "flex" : "none";
+    $("sliderCtl").style.display = (m === "slider") ? "flex" : "none";
+    $("zoomCtl").style.display = (m === "diff") ? "flex" : "flex";
+    if (diffData) render();
+  });
+  $("zoom").addEventListener("input", function () {
+    zoom = parseInt(this.value, 10);
+    $("zoomVal").textContent = zoom + "×";
+    if (diffData) render();
+  });
+  $("opacity").addEventListener("input", function () {
+    $("opVal").textContent = this.value + "%";
+    if (diffData && $("mode").value === "onion") render();
+  });
+  $("sliderPos").addEventListener("input", function () {
+    $("sliderVal").textContent = this.value + "%";
+    if (diffData && $("mode").value === "slider") render();
+  });
+  $("gridToggle").addEventListener("change", function () { if (diffData) render(); });
+
+  // ---------- downloads ----------
+  function download(canvas, name) {
+    var a = document.createElement("a");
+    a.download = name;
+    a.href = canvas.toDataURL("image/png");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  $("dlDiff").addEventListener("click", function () {
+    if (!diffData) return;
+    var c = makeCanvas(diffData.w, diffData.h);
+    c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(diffData.data), diffData.w, diffData.h), 0, 0);
+    download(c, "pixel-diff.png");
+  });
+
+  $("dlOverlay").addEventListener("click", function () {
+    if (!diffData) return;
+    var c = makeCanvas(diffData.w, diffData.h);
+    var ctx = c.getContext("2d");
+    var tmpB = makeCanvas(diffData.w, diffData.h);
+    tmpB.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataB.data), dataB.w, dataB.h), 0, 0);
+    ctx.drawImage(tmpB, 0, 0);
+    ctx.globalAlpha = 0.5;
+    var tmpA = makeCanvas(diffData.w, diffData.h);
+    tmpA.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(dataA.data), dataA.w, dataA.h), 0, 0);
+    ctx.drawImage(tmpA, 0, 0);
+    ctx.globalAlpha = 1;
+    download(c, "pixel-diff-onion.png");
+  });
+
+  // ---------- reset ----------
+  $("resetBtn").addEventListener("click", function () {
+    imgA = imgB = dataA = dataB = diffData = null;
+    ["thumbA", "thumbB"].forEach(function (id) { $(id).hidden = true; $(id).src = ""; });
+    ["fileA", "fileB"].forEach(function (id) { $(id).value = ""; });
+    ["dropA", "dropB"].forEach(function (id) { $(id).classList.remove("loaded"); });
+    $("mainCanvas").hidden = true;
+    $("sideCanvas").hidden = true;
+    $("mainPlaceholder").style.display = "";
+    $("sidePlaceholder").style.display = "";
+    $("stats").style.display = "none";
+    $("legend").style.display = "none";
+    $("dlDiff").disabled = true;
+    $("dlOverlay").disabled = true;
+    $("runMsg").textContent = "";
+    $("loadMsg").textContent = "";
+    updateReady();
+  });
+})();
+</script>
+</body>
+</html>
