@@ -187,6 +187,10 @@
     </div>
   </div>
   <div class="msg" id="loadMsg"></div>
+  <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <button id="loadExample" style="background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;">✨ Load example</button>
+    <span style="font-size:0.75rem; color:var(--muted);">No file? Try a built-in sample pair and see the diff instantly.</span>
+  </div>
 </div>
 
 <div class="card">
@@ -510,6 +514,76 @@
     $("dlDiff").disabled = false;
     $("dlOverlay").disabled = false;
   }
+
+  // ---------- load example ----------
+  function makeExampleSprite(version) {
+    var c = document.createElement("canvas");
+    c.width = 32; c.height = 32;
+    var ctx = c.getContext("2d");
+    // background
+    ctx.fillStyle = version === "A" ? "#2b3a67" : "#20304f";
+    ctx.fillRect(0, 0, 32, 32);
+    // ground
+    ctx.fillStyle = version === "A" ? "#3f6d4e" : "#4a7d5a";
+    ctx.fillRect(0, 26, 32, 6);
+    // sun / moon
+    ctx.fillStyle = version === "A" ? "#f6d365" : "#f2f2f2";
+    ctx.beginPath(); ctx.arc(24, 8, 5, 0, Math.PI * 2); ctx.fill();
+    // character body
+    ctx.fillStyle = version === "A" ? "#e0533d" : "#e07b3d";
+    ctx.fillRect(10, 14, 12, 10);
+    // head
+    ctx.fillStyle = "#f2c9a1";
+    ctx.fillRect(12, 6, 8, 8);
+    // eyes
+    ctx.fillStyle = "#1b1b1b";
+    ctx.fillRect(14, 9, 2, 2);
+    ctx.fillRect(18, 9, 2, 2);
+    // legs
+    ctx.fillStyle = "#333333";
+    ctx.fillRect(11, 24, 4, 3);
+    ctx.fillRect(17, 24, 4, 3);
+    // version-specific change: A has a sword, B has a shield
+    if (version === "A") {
+      ctx.fillStyle = "#cfd8dc";
+      ctx.fillRect(23, 12, 2, 8);
+      ctx.fillStyle = "#8d6e63";
+      ctx.fillRect(22, 19, 4, 2);
+    } else {
+      ctx.fillStyle = "#4f8cff";
+      ctx.fillRect(23, 13, 5, 7);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(25, 15, 1, 3);
+    }
+    return c;
+  }
+
+  function loadImageFromCanvas(canvas, thumbEl, setter) {
+    var url = canvas.toDataURL("image/png");
+    var img = new Image();
+    img.onload = function () {
+      thumbEl.src = url;
+      thumbEl.hidden = false;
+      setter(img);
+      updateReady();
+    };
+    img.src = url;
+  }
+
+  $("loadExample").addEventListener("click", function () {
+    var cA = makeExampleSprite("A");
+    var cB = makeExampleSprite("B");
+    loadImageFromCanvas(cA, $("thumbA"), function (img) { imgA = img; });
+    loadImageFromCanvas(cB, $("thumbB"), function (img) { imgB = img; });
+    setLoadMsg("Example pair loaded — press “Run diff” to see the changes.", false);
+    // auto-run once both are set
+    setTimeout(function () {
+      if (imgA && imgB) {
+        $("runBtn").disabled = false;
+        $("runBtn").click();
+      }
+    }, 120);
+  });
 
   // ---------- run ----------
   $("runBtn").addEventListener("click", function () {
